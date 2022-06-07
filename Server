@@ -48,17 +48,17 @@ ClearIptables() {
 }
 
 status=$(ps -ef | grep -w xray | grep -v grep | wc -l)
-if [ $status == 0 ]; then
+if [[ $1 == Restart && $status == 1 ]]; then
+	StopXray
 	StartXray
-	CreateIptables
 else
-	if [ $status == 1 ]; then
-		StopXray
-		ClearIptables
+	if [ $status == 0 ]; then
+		StartXray
+		CreateIptables
 	else
-		if [[ $1 == Restart && $status == 1 ]]; then
+		if [ $status == 1 ]; then
 			StopXray
-			StartXray
+			ClearIptables
 		fi
 	fi
 fi
