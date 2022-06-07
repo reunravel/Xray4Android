@@ -47,19 +47,18 @@ ClearIptables() {
 	Clear DIVERT
 }
 
-if [ $1 == Start ]; then
+status=$(ps -ef | grep -w xray | grep -v grep | wc -l)
+if [ $status == 0 ]; then
 	StartXray
 	CreateIptables
 else
-	if [ $1 == Stop ]; then
+	if [ $status == 1 ]; then
 		StopXray
 		ClearIptables
 	else
-		if [ $1 == Restart ]; then
-			if pgrep xray > 0; then
-				StopXray
-				StartXray
-			fi
+		if [[ $1 == Restart && $status == 1 ]]; then
+			StopXray
+			StartXray
 		fi
 	fi
 fi
