@@ -1,0 +1,102 @@
+{
+	"log": {
+		"loglevel": "none"
+	},
+	"inbounds": [{
+		"tag": "Proxy-In",
+		"port": 10809,
+		"protocol": "dokodemo-door",
+		"settings": {
+			"network": "tcp,udp",
+			"followRedirect": true
+		},
+		"sniffing": {
+			"enabled": true,
+			"destOverride": ["http", "tls"]
+		}
+	}],
+	"outbounds": [{
+		"tag": "Proxy"
+	}, {
+		"tag": "Direct",
+		"protocol": "freedom",
+		"settings": {
+			"domainStrategy": "UseIPv4"
+		}
+	}, {
+		"tag": "Reject",
+		"protocol": "blackhole",
+		"settings": {
+			"response": {
+				"type": "http"
+			}
+		}
+	}, {
+		"tag": "Dns-Out",
+		"protocol": "dns"
+	}],
+	"dns": {
+		"hosts": {
+			"geosite:category-ads-all": "127.0.0.1"
+		},
+		"servers": [{
+			"address": "https://8.8.8.8/dns-query"
+		}, {
+			"address": "https://1.1.1.1/dns-query",
+			"domains": ["geosite:geolocation-!cn", "geosite:google@cn"],
+			"expectIPs": ["geoip:!cn"]
+		}, {
+			"address": "https+local://223.6.6.6/dns-query",
+			"domains": ["geosite:cn", "geosite:private", "geosite:tld-cn", "geosite:category-games@cn"],
+			"expectIPs": ["geoip:cn", "geoip:private"]
+		}],
+		"domainStrategy": "UseIPv4"
+	},
+	"routing": {
+		"domainStrategy": "IPIfNonMatch",
+		"domainMatcher": "mph",
+		"rules": [{
+			"type": "field",
+			"outboundTag": "Direct",
+			"protocol": ["bittorrent"]
+		}, {
+			"type": "field",
+			"outboundTag": "Dns-Out",
+			"inboundTag": ["Proxy-In"],
+			"network": "udp",
+			"port": 53
+		}, {
+			"type": "field",
+			"outboundTag": "Reject",
+			"domain": ["geosite:category-ads-all"]
+		}, {
+			"type": "field",
+			"outboundTag": "Proxy",
+			"domain": ["geosite:facebook", "geosite:google", "geosite:telegram", "geosite:twitter"]
+		}, {
+			"type": "field",
+			"outboundTag": "Direct",
+			"domain": ["geosite:tld-cn", "geosite:category-games@cn"]
+		}, {
+			"type": "field",
+			"outboundTag": "Proxy",
+			"domain": ["geosite:geolocation-!cn"]
+		}, {
+			"type": "field",
+			"outboundTag": "Direct",
+			"domain": ["geosite:cn", "geosite:private"]
+		}, {
+			"type": "field",
+			"outboundTag": "Proxy",
+			"ip": ["geoip:!cn"]
+		}, {
+			"type": "field",
+			"outboundTag": "Direct",
+			"ip": ["geoip:cn", "geoip:private"]
+		}, {
+			"type": "field",
+			"outboundTag": "Proxy",
+			"network": "tcp,udp"
+		}]
+	}
+}

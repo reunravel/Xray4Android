@@ -1,0 +1,65 @@
+StartXray() {
+	if [ ! -f "/system/etc/resolv.conf" ]; then
+		echo "nameserver 223.6.6.6" >/system/etc/resolv.conf
+		chmod 0644 /system/etc/resolv.conf
+		chown root:root /system/etc/resolv.conf
+	fi
+	ulimit -SHn 1000000
+	setuidgid 0:23333 nohup ${0%/*}/xray run -confdir ${0%/*} >/dev/null 2>&1 &
+}
+
+CreateIptables() {
+	ip ru a fwmark 1 table 100
+	ip ro a local 0.0.0.0/0 dev lo table 100
+	iptables -t mangle -N XRAY
+	iptables -t mangle -A XRAY -d 127.0.0.1/32 -j RETURN
+	iptables -t mangle -A XRAY -d 10.0.0.0/8 -j RETURN
+	iptables -t mangle -A XRAY -d 192.168.0.0/16 -j RETURN
+	iptables -t mangle -A XRAY -d 255.255.255.255/32 -j RETURN
+	iptables -t mangle -A XRAY -p tcp -j TPROXY --on-port 10809 --tproxy-mark 1
+	iptables -t mangle -A XRAY -p udp -j TPROXY --on-port 10809 --tproxy-mark 1
+	iptables -t mangle -A PREROUTING -j XRAY
+	iptables -t mangle -N XRAY_MASK
+	iptables -t mangle -A XRAY_MASK -d 192.168.0.0/16 -j RETURN
+	iptables -t mangle -A XRAY_MASK -j MARK --set-mark 1
+	iptables -t mangle -A OUTPUT -m owner ! --gid-owner 23333 ! -p icmp -j XRAY_MASK
+	iptables -t mangle -N DIVERT
+	iptables -t mangle -A DIVERT -j MARK --set-mark 1
+	iptables -t mangle -A DIVERT -j ACCEPT
+	iptables -t mangle -I PREROUTING -p tcp -m socket -j DIVERT
+}
+
+Clear() {
+	iptables -t mangle -F $1
+	iptables -t mangle -X $1
+}
+
+StopXray() {
+	kill -9 $(pgrep xray)
+}
+
+ClearIptables() {
+	ip ru d fwmark 1 table 100
+	ip ro d local 0.0.0.0/0 dev lo table 100
+	iptables-save | grep -E "XRAY|DIVERT" | grep -E "PREROUTING|OUTPUT" | sed 's/-A/iptables -t mangle -D/g' | sh
+	Clear XRAY
+	Clear XRAY_MASK
+	Clear DIVERT
+}
+
+if [ $1 == Start ]; then
+	StartXray
+	CreateIptables
+else
+	if [ $1 == Stop ]; then
+		StopXray
+		ClearIptables
+	else
+		if [ $1 == Restart ]; then
+			if pgrep xray > 0; then
+				StopXray
+				StartXray
+			fi
+		fi
+	fi
+fi
